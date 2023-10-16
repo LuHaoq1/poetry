@@ -2,9 +2,24 @@ import tkinter as tk
 import tkinter.messagebox
 from tkinter import *
 import ttkbootstrap as ttk
+import model_5
+import torch
+import model_7
 
 # 窗口大小
 page_size = '800x500+900+450'
+
+#
+params = {
+        "batch_size": 32,  # batch(古诗数)大小
+        "epochs": 1000,  # epoch大小
+        "lr": 0.003,  # 学习率
+        "hidden_num": 64,  # 隐层大小
+        "embedding_num": 128,  # 词向量维度
+        "train_num": 2000,  # 训练的古诗数量, 七言古诗:0~6290, 五言古诗:0~2929
+        "optimizer": torch.optim.AdamW,  # 优化器 , 注意不要加括号
+        "batch_num_test": 100,  # 多少个batch 打印一首古诗进行效果测试
+    }
 
 
 # 主页面
@@ -69,10 +84,8 @@ class FiveChars(object):
         # 切换模式使藏头输入框消失和出现
         def toggle_input():
             if self.var.get() == 0:
-                print(self.var)
                 acrostic_input.place_forget()
             else:
-                print(self.var)
                 acrostic_input.place(relx=0.28, rely=0.3)
 
         # 实现输入框默认提示
@@ -82,8 +95,11 @@ class FiveChars(object):
 
         # 生成诗歌
         def get_poetry():
-            key = 1
-            # key = DesEncode.DesCode().create_key()
+            if self.var.get() == 0:
+                key = model_5.PoetryModellstm(params).generate_poetry_auto()
+                print(key)
+            else:
+                key = model_5.PoetryModellstm(params).generate_poetry_acrostic(self.acrostic)
             poetry_show.delete(0.0, tk.END)
             poetry_show.insert('insert', str(key))
 
@@ -148,10 +164,8 @@ class SevenChars(object):
         # 切换模式使藏头输入框消失和出现
         def toggle_input():
             if self.var.get() == 0:
-                print(self.var)
                 acrostic_input.place_forget()
             else:
-                print(self.var)
                 acrostic_input.place(relx=0.28, rely=0.3)
 
         # 实现输入框默认提示
@@ -161,9 +175,10 @@ class SevenChars(object):
 
         # 生成诗歌
         def get_poetry():
-            key = 1
-            # key = DesEncode.DesCode().create_key()
-            poetry_show.delete(0.0, tk.END)
+            if self.var.get() == 0:
+                key = model_7.PoetryModellstm(params).generate_poetry_auto()
+            else:
+                key = model_7.PoetryModellstm(params).generate_poetry_acrostic(self.acrostic)
             poetry_show.insert('insert', str(key))
 
         '''
