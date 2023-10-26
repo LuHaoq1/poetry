@@ -6,9 +6,9 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from split_vec7 import SplitVec7
 from poetry_dataset import PoetryDataset7
+from pypinyin import lazy_pinyin,Style
 
-
-class PoetryModellstm(nn.Module):
+class PoetryModellstm7(nn.Module):
     def __init__(self, params):
         super().__init__()
         self.all_data, (self.w1, self.word_2_index, self.index_2_word) = SplitVec7().train_vec(vector_size=params["embedding_num"],
@@ -85,58 +85,86 @@ class PoetryModellstm(nn.Module):
             pre, (h_0, c_0) = self(word_embedding, h_0, c_0)
             word_index = int(torch.argmax(pre))
             result += self.index_2_word[word_index]
-
-        print(result)
-
-    def generate_poetry_acrostic(self):
-
-        while True:
-
-            input_text = input("请输入汉字：")
-            input_text = input_text[:len(input_text)]
-            if input_text == "":
-                self.generate_poetry_auto()
+        if self.count_punctuation(result):
+            if self.cut(result):
+                return result
             else:
+                temp = self.generate_poetry_auto()
+                return temp
+        else:
+            temp = self.generate_poetry_auto()
+            return temp
 
-                result = ""
-                punctuation_list = ["，", "。"]
-                for num in range(len(input_text)//2):
-                    punctuation_list += punctuation_list
-                for i in range(len(input_text)):
+    def generate_poetry_acrostic(self, str_in):
+        input_text = str_in
+        input_text = input_text[:len(input_text)]
+        if input_text == "":
+            self.generate_poetry_auto()
+        else:
 
-                    h_0 = torch.tensor(np.zeros((2, 1, self.hidden_num), dtype=np.float32))
-                    c_0 = torch.tensor(np.zeros((2, 1, self.hidden_num), dtype=np.float32))
-                    word = input_text[i]
-                    try:
-                        word_index = self.word_2_index[word]
-                    except:
-                        word_index = np.random.randint(0, self.word_size, 1)[0]
-                        word = self.index_2_word[word_index]
+            result = ""
+            punctuation_list = ["，", "。"]
+            for num in range(len(input_text)//2):
+                punctuation_list += punctuation_list
+            for i in range(len(input_text)):
+
+                h_0 = torch.tensor(np.zeros((2, 1, self.hidden_num), dtype=np.float32))
+                c_0 = torch.tensor(np.zeros((2, 1, self.hidden_num), dtype=np.float32))
+                word = input_text[i]
+                try:
+                    word_index = self.word_2_index[word]
+                except:
+                    word_index = np.random.randint(0, self.word_size, 1)[0]
+                    word = self.index_2_word[word_index]
+                result += word
+
+                for j in range(6):
+                    word_index = self.word_2_index[word]
+                    word_embedding = torch.tensor(self.w1[word_index][None][None])
+                    pre, (h_0, c_0) = self(word_embedding, h_0, c_0)
+                    word = self.index_2_word[int(torch.argmax(pre))]
                     result += word
+                result += punctuation_list[i]
+            if self.cut(result):
+                return result
+            else:
+                temp = self.generate_poetry_acrostic(str_in)
+                return temp
 
-                    for j in range(6):
-                        word_index = self.word_2_index[word]
-                        word_embedding = torch.tensor(self.w1[word_index][None][None])
-                        pre, (h_0, c_0) = model(word_embedding, h_0, c_0)
-                        word = self.index_2_word[int(torch.argmax(pre))]
-                        result += word
-                    result += punctuation_list[i]
-                print(result)
+    # 检查是否押韵
+    def cut(self, result):
+        temp = []
+        for i in range(len(result)):
+            if result[i] == '。':
+                temp.append(lazy_pinyin(result[i-1], style=Style.FINALS)[0])
+        if len(temp) != len(set(temp)):
+            return True
+        else:
+            return False
+
+    # 检查标点符合是否合规
+    def count_punctuation(self, poem):
+        comma_count = poem.count('，')
+        period_count = poem.count('。')
+        if comma_count == 2 and period_count == 2:
+            return True
+        else:
+            return False
 
 
 if __name__ == "__main__":
     # ---------------------------------  个性化参数  --------------------------------------
     params = {
         "batch_size": 32,  # batch(古诗数)大小
-        "epochs": 1000,  # epoch大小
-        "lr": 0.003,  # 学习率
+        "epochs": 2000,  # epoch大小
+        "lr": 0.001,  # 学习率
         "hidden_num": 64,  # 隐层大小
-        "embedding_num": 128,  # 词向量维度
-        "train_num": 1000,  # 训练的古诗数量, 七言古诗:0~6290, 五言古诗:0~2929
+        "embedding_num": 200,  # 词向量维度
+        "train_num": 5000,  # 训练的古诗数量, 七言古诗:0~6290, 五言古诗:0~2929
         "optimizer": torch.optim.AdamW,  # 优化器 , 注意不要加括号
         "batch_num_test": 100,  # 多少个batch 打印一首古诗进行效果测试
     }
 
-    model = PoetryModellstm(params)  # 模型定义
+    model = PoetryModellstm7(params)  # 模型定义
     model = model.to_train()  # 模型训练
-    model.generate_poetry_acrostic()  # 测试藏头诗
+    print(model.generate_poetry_acrostic("落花无言"))  # 测试藏头诗
